@@ -8,6 +8,6 @@
   };
   run = {
     # Command to run your FastAPI app
-    command = "uvicorn app.main:app --host 0.0.0.0 --port $PORT";
+    command = "uvicorn app:app --host 0.0.0.0 --port $PORT";
   };
 }
