@@ -309,6 +309,70 @@ async def predict(model_name: str, features: Features):
         logger.error("Stack trace: " + traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/predict12")
+async def predict(model_name: str, features: Features):
+    try:
+        # Ensure MODEL_PATH points to the correct directory where models are stored
+        models_dir = '/app/models'
+        
+        # Construct paths for the model and preprocessor based on model_name
+        model_path = os.path.join(models_dir, f'credit_model_{model_name}.pkl')
+        preprocessor_path = os.path.join(models_dir, f'preprocessor_{model_name}.pkl')
+
+        # Log paths for debugging
+        logger.info(f"Loading model from: {model_path}")
+        logger.info(f"Loading preprocessor from: {preprocessor_path}")
+
+        # Check if the model and preprocessor files exist
+        if not os.path.exists(model_path):
+            raise HTTPException(status_code=404, detail=f"Model file not found at path: {model_path}")
+        if not os.path.exists(preprocessor_path):
+            raise HTTPException(status_code=404, detail=f"Preprocessor file not found at path: {preprocessor_path}")
+
+        # Load the model and preprocessor
+        model = joblib.load(model_path)
+        preprocessor = joblib.load(preprocessor_path)
+        
+        # Log model and preprocessor loaded successfully
+        logger.info("Model and preprocessor loaded successfully.")
+
+        # Convert features to DataFrame
+        feature_values = pd.DataFrame([features.dict()])
+
+        # Log feature values for debugging
+        logger.info(f"Features received: {feature_values}")
+
+        # Process the features using the preprocessor
+        processed_features = preprocessor.transform(feature_values)
+        
+        # Log processed features for debugging
+        logger.info(f"Processed features: {processed_features}")
+
+        # Make prediction
+        prediction = model.predict(processed_features)
+        prediction_proba = model.predict_proba(processed_features)[0][1]
+
+        # Define creditworthiness based on prediction
+        creditworthiness = "Good" if prediction[0] == 1 else "Bad"
+
+        # Create response
+        response = PredictionResponse(
+            default_probability=prediction_proba,
+            creditworthiness=creditworthiness,
+            model_confidence=model.score(processed_features, prediction),
+            ai_credit_score=prediction_proba * 100,
+            recommendations=["Increase credit score", "Reduce debt"],
+            model_accuracy=model.score(processed_features, prediction),
+            feature_weights=dict(zip(preprocessor.get_feature_names_out(), model.coef_.flatten()))
+        )
+        
+        logger.info(f"Prediction completed successfully: {response}")
+        return response
+    except Exception as e:
+        # Log detailed error message and stack trace
+        logger.error(f"Error making prediction: {str(e)}")
+        logger.error("Stack trace: " + traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/predictpercentage")
 async def predict(model_name: str, features: Features):
